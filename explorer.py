@@ -16,6 +16,7 @@ Handlers required by the explorer operations
 """
 
 import base64
+import os
 import re
 import time
 
@@ -1152,6 +1153,9 @@ class ExplorerLast50(BaseHandler):
 
 
 class HolderListPageHandler(BaseHandler):
+    def get_template_path(self):
+        return os.path.join(os.path.dirname(__file__), "templates")
+
     async def get(self):
         self.render("holders.html", title="YadaCoin - Holder List")
 
