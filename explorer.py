@@ -16,7 +16,6 @@ Handlers required by the explorer operations
 """
 
 import base64
-import os
 import re
 import time
 
@@ -268,34 +267,6 @@ class HashrateAPIHandler(BaseHandler):
         elif time.time() - self.config.HashRateAPIHandler["cache"]["time"] > 600:
             await self.refresh()
         self.render_as_json({"stats": self.config.HashRateAPIHandler["cache"]})
-
-
-_CHAIN_EXPLORER_INDEX = os.path.normpath(
-    os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "..",
-        "plugins",
-        "chainexplorer",
-        "dist",
-        "index.html",
-    )
-)
-
-
-class ExplorerHandler(BaseHandler):
-    async def get(self):
-        if os.path.exists(_CHAIN_EXPLORER_INDEX):
-            from plugins.chainexplorer.handlers import explorer_page
-
-            self.set_header("Content-Type", "text/html; charset=utf-8")
-            self.finish(explorer_page(self))
-            return
-        self.render(
-            "explorer/index.html",
-            title="YadaCoin - Explorer",
-            mixpanel="explorer page",
-        )
 
 
 class ExplorerSearchHandler(BaseHandler):
@@ -1317,7 +1288,6 @@ class HolderListAPIHandler(BaseHandler):
 
 EXPLORER_HANDLERS = [
     (r"/api-stats", HashrateAPIHandler),
-    (r"/explorer", ExplorerHandler),
     (r"/explorer-search", ExplorerSearchHandler),
     (r"/explorer-get-balance", ExplorerGetBalance),
     (r"/explorer-latest", ExplorerLatestHandler),
