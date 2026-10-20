@@ -238,6 +238,31 @@ def _address_for_public_key(public_key):
         return ""
 
 
+class ExplorerHandler(BaseHandler):
+    async def get(self):
+        index = os.path.normpath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "chainexplorer",
+                "dist",
+                "index.html",
+            )
+        )
+        if not os.path.exists(index):
+            self.set_status(503)
+            self.set_header("Content-Type", "text/html; charset=utf-8")
+            self.finish(
+                "<pre>Chain explorer is not built.\n"
+                "Pull plugins/chainexplorer and rebuild dist.</pre>"
+            )
+            return
+        from plugins.chainexplorer.handlers import explorer_page
+
+        self.set_header("Content-Type", "text/html; charset=utf-8")
+        self.finish(explorer_page(self))
+
+
 class HashrateAPIHandler(BaseHandler):
     async def refresh(self):
         from yadacoin.core.block import Block
@@ -1291,6 +1316,7 @@ class HolderListAPIHandler(BaseHandler):
 
 
 EXPLORER_HANDLERS = [
+    (r"/explorer/?", ExplorerHandler),
     (r"/api-stats", HashrateAPIHandler),
     (r"/explorer-search", ExplorerSearchHandler),
     (r"/explorer-get-balance", ExplorerGetBalance),
