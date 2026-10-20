@@ -238,37 +238,6 @@ def _address_for_public_key(public_key):
         return ""
 
 
-_CHAIN_EXPLORER_INDEX = os.path.normpath(
-    os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "chainexplorer",
-        "dist",
-        "index.html",
-    )
-)
-
-
-class ExplorerHandler(BaseHandler):
-    def get_template_path(self):
-        return os.path.join(
-            os.path.dirname(__file__), "..", "yadacoinweb", "templates"
-        )
-
-    async def get(self):
-        if os.path.exists(_CHAIN_EXPLORER_INDEX):
-            from plugins.chainexplorer.handlers import explorer_page
-
-            self.set_header("Content-Type", "text/html; charset=utf-8")
-            self.finish(explorer_page(self))
-            return
-        self.render(
-            "explorer/index.html",
-            title="YadaCoin - Explorer",
-            mixpanel="explorer page",
-        )
-
-
 class HashrateAPIHandler(BaseHandler):
     async def refresh(self):
         from yadacoin.core.block import Block
@@ -1323,7 +1292,6 @@ class HolderListAPIHandler(BaseHandler):
 
 EXPLORER_HANDLERS = [
     (r"/api-stats", HashrateAPIHandler),
-    (r"/explorer/?", ExplorerHandler),
     (r"/explorer-search", ExplorerSearchHandler),
     (r"/explorer-get-balance", ExplorerGetBalance),
     (r"/explorer-latest", ExplorerLatestHandler),
