@@ -1177,17 +1177,38 @@ class ExplorerLast50(BaseHandler):
         return self.render_as_json(miners)
 
 
-class HolderListPageHandler(BaseHandler):
+class HolderListBaseHandler(BaseHandler):
     def get_template_path(self):
         return os.path.join(os.path.dirname(__file__), "templates")
 
+    async def prepare(self, exceptions=None):
+        await super().prepare(exceptions=exceptions)
+        if self._finished:
+            return
+        if self.request.method == "OPTIONS":
+            return
+        if await self.wallet_is_unlocked():
+            return
+        if (self.request.path or "").startswith("/api-holders"):
+            self.set_status(401)
+            self.render_as_json(
+                {
+                    "status": False,
+                    "error": "Run your own node to load the holder list.",
+                }
+            )
+
+
+class HolderListPageHandler(HolderListBaseHandler):
     async def get(self):
         self.render("holders.html", title="YadaCoin - Holder List")
 
 
 @jwtauthwallet
-class HolderListAPIHandler(BaseHandler):
+class HolderListAPIHandler(HolderListBaseHandler):
     async def get(self):
+        if not await self.wallet_is_unlocked():
+            return
         # Cache for 10 minutes — computing all balances is expensive
         if hasattr(self.config, "_holder_list_cache"):
             cached = self.config._holder_list_cache
