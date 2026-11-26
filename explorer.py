@@ -22,6 +22,7 @@ import time
 
 from yadacoin.core.chain import CHAIN
 from yadacoin.core.common import changetime
+from yadacoin.core.config import Config
 from yadacoin.decorators.jwtauth import jwtauthwallet
 from yadacoin.http.base import BaseHandler
 
@@ -296,27 +297,48 @@ class HashrateAPIHandler(BaseHandler):
 
 
 class ExplorerSearchHandler(BaseHandler):
-    async def get_wallet_balance(self, term):
-        re.search(r"[A-Fa-f0-9]+", term).group(0)
-        res = await self.config.mongo.async_db.blocks.count_documents(
-            {"transactions.outputs.to": term}
-        )
-        if res:
-            balance = await self.config.BU.get_wallet_balance(term)
+    async def get_wallet_balance(self, term, allow_empty=False):
+        query = {"transactions.outputs.to": term}
+        try:
+            res = await self.config.mongo.async_db.blocks.count_documents(
+                query, hint="__to", limit=1
+            )
+        except Exception:
+            res = await self.config.mongo.async_db.blocks.count_documents(query)
+        # The queried address may be an inception/K0 address with no direct
+        # outputs. get_wallet_balance expands the full KEL, so run it before
+        # deciding there is no history to show.
+        balance = await self.config.BU.get_wallet_balance(term)
+        if not res:
+            if not allow_empty:
+                return None
             return self.render_as_json(
                 {
-                    "balance": "{0:.8f}".format(balance),
+                    "balance": "{0:.8f}".format(float(balance or 0.0)),
                     "resultType": "txn_outputs_to",
-                    "result": [
-                        changetime(x)
-                        async for x in self.config.mongo.async_db.blocks.find(
-                            {"transactions.outputs.to": term}, {"_id": 0}
-                        )
-                        .sort("index", -1)
-                        .limit(10)
-                    ],
+                    "result": [],
                 }
             )
+        try:
+            cursor = (
+                self.config.mongo.async_db.blocks.find(query, {"_id": 0})
+                .hint("__to")
+                .sort("index", -1)
+                .limit(10)
+            )
+        except Exception:
+            cursor = (
+                self.config.mongo.async_db.blocks.find(query, {"_id": 0})
+                .sort("index", -1)
+                .limit(10)
+            )
+        return self.render_as_json(
+            {
+                "balance": "{0:.8f}".format(balance),
+                "resultType": "txn_outputs_to",
+                "result": [changetime(x) async for x in cursor],
+            }
+        )
 
     async def _iter_docs(self, collection, queries):
         docs = []
@@ -622,11 +644,19 @@ class ExplorerSearchHandler(BaseHandler):
             return
 
         result_type = self.get_argument("result_type", False)
-        if result_type == "get_wallet_balance":
+        if result_type == "get_wallet_balance" or Config.address_is_valid(term):
             try:
-                return await self.get_wallet_balance(term)
+                return await self.get_wallet_balance(term, allow_empty=True)
             except Exception:
-                raise
+                if result_type == "get_wallet_balance":
+                    raise
+                return self.render_as_json(
+                    {
+                        "balance": "0.00000000",
+                        "resultType": "txn_outputs_to",
+                        "result": [],
+                    }
+                )
 
         try:
             res = await self.config.mongo.async_db.blocks.count_documents(
@@ -1128,7 +1158,7 @@ class ExplorerGetBalance(BaseHandler):
         if not address:
             self.render_as_json({})
             return
-        balance = await self.config.BU.get_wallet_balance(address, wait=False)
+        balance = await self.config.BU.get_wallet_balance(address)
         return self.render_as_json({"balance": "{0:.8f}".format(balance)})
 
 
